@@ -2,6 +2,30 @@
 
 Pick the correct style for source files.
 
+## GNU Emacs integration.
+
+Add the following to your `~/.emacs.d/init.el`:
+
+    (defun pickstyle ()
+      (replace-regexp-in-string
+       "\n\\'" ""
+       (let ((default-directory "~/"))
+         (shell-command-to-string
+          (concat "sh -c "
+                  "\""
+                  "pickstyle -D " buffer-file-name " 2>/dev/null || echo 'k&r'"
+                  "\"")))))
+    
+    (defun pickstyle-show ()
+      (interactive)
+      (message (pickstyle)))
+    
+    (defun pickstyle-set ()
+      (interactive)
+      (c-set-style (pickstyle)))
+    
+    (add-hook 'c-mode-common-hook 'pickstyle-set)
+
 ## Help
 
 descstyle
