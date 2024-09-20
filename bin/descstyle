@@ -1,0 +1,49 @@
+#!/bin/sh -e
+##:
+#h: Usage: descstyle [STYLE] [SECTION]
+#h:
+#h: Get programming style information from "share/styles/STYLE" which
+#h: follow the following format.
+#h:
+#h:   url: URL
+#h:   desc: Awesome style.
+#h:   text: This project follows the Awesome style.
+#h:   check: check-awesome-style %f
+#h:
+#h: Use this program for placing references to the style in the README.
+##:
+descstyle() {
+    local style="$1" section="$2" f n d
+    
+    if test ! -n "${style}"; then
+        if test -d "${DESCSTYLE_DIR}/share/styles"; then
+            for f in $(find "${DESCSTYLE_DIR}/share/styles" -type f); do
+                n="$(basename "${f}")"
+                d="$(sed -n 's|^desc: *||p' "${f}" | head -n 1)"
+                printf '%-20s : %s\n' "${n}" "${d}"
+            done
+        fi
+        return 0
+    fi
+
+    if test -n "${style}" && test ! -f "${DESCSTYLE_DIR}/share/styles/${style}"; then
+        echo >&2 "descstyle: error: ${style}: Style not found."
+        return 1
+    fi
+    
+    if test ! -n "${section}"; then
+        cat "${DESCSTYLE_DIR}/share/styles/${style}"
+        return 0
+    fi
+    
+    sed -n "s|^${section}: *||p" "${DESCSTYLE_DIR}/share/styles/${style}"
+}
+## -------------------------------------------------------------------
+DESCSTYLE_DIR="${DESCSTYLE_DIR:-$(readlink -f "$(dirname "$0")/..")}"
+if test @"${SCRNAME:-$(basename "$0")}" = @"descstyle"; then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        -*V*)      echo "DESCSTYLE_DIR : ${DESCSTYLE_DIR}";;
+        *)         descstyle "$@"; exit 0;;
+    esac
+fi

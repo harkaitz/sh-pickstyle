@@ -1,0 +1,115 @@
+#!/bin/sh -e
+##:
+#h: Usage: pickstyle {-l | -c | [-D] [FILE] }
+#h:
+#h: This program returns the indentation style to use with files. The
+#h: configuration file format is as follows:
+#h:
+#h:     FILE_REGEX     STYLE
+#h:
+#h: The configuration files are read in order: $PICKSTYLE_FILE,
+#h: ~/.pickstyle, ~/.local/etc/pickstyle/* and  /etc/pickstyle/*.
+#h:
+#h: The program maintains a cache in ~/.cache/pickstyle, it can be
+#h: refreshed with "-c". With "-l" you can view the list.
+#h:
+#h: If upwards a "./pkg/STYLE" file exists the style is read from it.
+#h: When "-D" is specified the default style in "/etc/cstyle" is checked
+#h: out too, and without any options inferred from the system.
+##:
+pickstyle() {
+    local path dir cur0 cur1 found cfg curr PICKSTYLE_REFRESHED opt_D=
+    
+    case "$1" in -*l*) pickstyle_list    ;; esac
+    case "$1" in -*c*) pickstyle_refresh ;; esac
+    case "$1" in -*D*) opt_D=y;; esac
+    case "$1" in -*) shift;; esac
+    
+    if test -n "$1" && test -d "$1"; then
+        dir="$(readlink -f "$1")"
+        path="${dir}/."
+    elif test -n "${1}" && test -f "$1"; then
+        dir="$(readlink -f "$(dirname "$1")")"
+        path="${dir}/$(basename "$1")"
+    elif test -n "${1}"; then
+        dir="$(dirname "${1}")"
+        path="${1}"
+    else
+        dir="$(pwd)"
+        path="${dir}/."
+    fi
+
+    cur0="${dir}" cur1=""
+    while test ! @"${cur0}" = @"${cur1}"; do
+        if test -f "${cur0}/pkg/STYLE"; then
+            head -n 1 "${cur0}/pkg/STYLE"
+            return 0
+        fi
+        cur1="${cur0}"
+        cur0="$(dirname "${cur0}")"
+    done
+    
+    
+    if test ! -f ~/.cache/pickstyle; then
+        pickstyle_refresh
+    fi
+
+    found="$(awk -v p="${path}" 'p ~ $1 { print $2; exit(0); }' ~/.cache/pickstyle)"
+    if test ! -n "${found}" && test ! -n "${PICKSTYLE_REFRESHED}"; then
+        pickstyle_refresh
+        found="$(awk -v p="${path}" 'p ~ $1 { print $2; exit(0); }' ~/.cache/pickstyle)"
+    fi
+    if test -n "${found}"; then
+        echo "${found}"
+        return 0
+    fi
+
+    if test -n "${opt_D}"; then
+        if test -f /etc/cstyle; then
+            cat /etc/cstyle
+            return 0
+        fi
+        case "$(uname -s)" in
+            *BSD*) echo "bsd";;
+            *)     echo "k&r";;
+        esac
+        return 0
+    fi
+        
+    echo >&2 "pickstyle: error: ${path}: Can't find a style for the path."
+    return 1
+    
+}
+## -------------------------------------------------------------------
+pickstyle_list() {
+    if true; then
+        if test -n "${PICKSTYLE_FILE}" && test -f "${PICKSTYLE_FILE}"; then
+            cat "${PICKSTYLE_FILE}"
+        fi
+        if test -f ~/.pickstyle; then
+            cat ~/.pickstyle
+        fi
+        if test -d ~/.local/etc/pickstyle; then
+            find ~/.local/etc/pickstyle -type f -exec 'cat' '{}' ';' 
+        fi
+        if test -d /etc/pickstyle; then
+            find /etc/pickstyle -type f -exec 'cat' '{}' ';' 
+        fi
+    fi | sed 's|\#.*||;/^ *$/d'
+}
+pickstyle_refresh() {
+    mkdir -p ~/.cache
+    pickstyle_list > ~/.cache/pickstyle.tmp
+    mv ~/.cache/pickstyle.tmp ~/.cache/pickstyle
+    PICKSTYLE_REFRESHED=y
+}
+
+
+
+## -------------------------------------------------------------------
+if test @"${SCRNAME:-$(basename "$0")}" = @"pickstyle"; then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)         pickstyle "$@"; exit 0;;
+    esac
+fi

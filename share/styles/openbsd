@@ -1,0 +1,3 @@
+url: https://man.openbsd.org/style
+desc: OpenBSD kernel source file style guide (KNF).
+text: This project follows the OpenBSD kernel source file style guide (KNF).
